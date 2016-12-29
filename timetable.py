@@ -1,10 +1,11 @@
 from lirrparser import parse_all_stations, parse_train_schedule_response
 import os
-import urllib.request
+import requests
 import datetime
-import codecs
+#import codecs
 from pytz import timezone
 import pytz
+import json
 
 
 class TimeTable:
@@ -42,9 +43,9 @@ class TimeTable:
         from_abr = self._get_abbreviated_station(from_station)
         to_abr = self._get_abbreviated_station(to_station)
         time_url = self._get_train_time_url(from_abr, to_abr)
-        print(time_url)
-        reader = codecs.getreader("utf-8")
-        response = reader(urllib.request.urlopen(time_url))
+        #print(time_url)
+        #reader = codecs.getreader("utf-8")
+        response = requests.get(time_url).text
         return response
 
     def __init__(self):
@@ -54,9 +55,8 @@ class TimeTable:
             self.MTA_TOKEN = os.environ[self.ENV_VAR_MTA_TOKEN]
 
     def load_all_stations(self):
-        response = urllib.request.urlopen(self.__get_all_stations_url())
-        reader = codecs.getreader("utf-8")
-        all_stations = reader(response)
+        response = requests.get(self.__get_all_stations_url())
+        all_stations = response.text
         self._station_list = parse_all_stations(all_stations)
 
     def _get_abbreviated_station(self, station_name):
@@ -69,8 +69,9 @@ class TimeTable:
     def get_train_time(self, from_station, to_station):
         timetable_text = self.__get_time_table(from_station, to_station)
         times = parse_train_schedule_response(timetable_text)
-        print(times)
         # find the time greater than or equal to now
+        if len(times) == 0:
+            return "NA"
         now = self._get_localized_time_now()
         eastern = timezone('US/Eastern')
         for t in times:
@@ -78,6 +79,7 @@ class TimeTable:
             if t_eastern > now:
                 return TimeTable._convert_militarytime_to_spoken_time(t)
         return TimeTable._convert_militarytime_to_spoken_time(times[0])
+
 
     @staticmethod
     def _convert_militarytime_to_spoken_time(militarytime):
